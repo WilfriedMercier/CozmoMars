@@ -12,7 +12,6 @@ import asyncio
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-import time
 import sys
 
 import cozmo
@@ -20,11 +19,15 @@ from   cozmo.util       import distance_mm, speed_mmps, degrees
 from   cozmo.exceptions import RobotBusy
 
 from   PyQt5.QtWidgets  import QMainWindow, QApplication, QWidget, QGridLayout, QLabel, QShortcut, QComboBox, QDoubleSpinBox
-from   PyQt5.QtGui      import QPixmap, QKeySequence
-from   PyQt5.QtCore     import Qt
+from   PyQt5.QtGui      import QKeySequence
+from   PyQt5.QtCore     import Qt, QThread
 
 from   PIL              import Image
 from   PIL.ImageQt      import ImageQt
+
+from   types            import MethodType
+
+from   cozmo_backend    import Worker
 
 
 class App(QMainWindow):
@@ -38,15 +41,14 @@ class App(QMainWindow):
         self.setWindowTitle('Cozmo Mars')
         
         # Setup robot properties
-        self.robot                        = robot
-        self.speed                        = 100 # mm/s
-        self.headSpeed                    = 0.3 # rad/s
-        self.liftSpeed                    = 1 # rad/s
-        self.factor                       = 2
+        self.thread                       = QThread()
+        self.worker                       = Worker(self, robot, 100, 0.3, 1, 2)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.thread.start()
+        
         self.direction                    = []
-        robot.camera.color_image_enabled  = True
-        robot.camera.image_stream_enabled = True
-        robot.add_event_handler(cozmo.world.EvtNewCameraImage, self._getImage)
+        
         
         # Delay to add to Cozmo 
         self.delays                       = {'Mars'  : 2.5,
@@ -55,20 +57,24 @@ class App(QMainWindow):
                                             }
         
         # Window
-        self.win            = QWidget()
-        self.layoutWin      = QGridLayout()
+        self.win                          = QWidget()
+        self.layoutWin                    = QGridLayout()
         
         # Widgets
         self.label = QLabel()
         
         self.combobox = QComboBox()
-        self.combobox.keyPressEvent = self.keyPressEvent
+        self.combobox.keyPressEvent       = self.keyPressEvent
         self.combobox.insertItem(0, 'Lune')
         self.combobox.insertItem(1, 'Venus')
         self.combobox.insertItem(2, 'Mars')
-        #self.combobox.clicked.connect(self.updateDelay)
+        self.combobox.insertItem(3, 'Manuel')
+        self.combobox.activated.connect(self.updateDelay)
         
         self.spinbox  = QDoubleSpinBox()
+        self.spinbox.savedKeyPressEvent   = self.spinbox.keyPressEvent
+        self.spinbox.keyPressEvent        = self.spinboxPressEvent
+        self.spinbox.setReadOnly(True)
         self.spinbox.setSuffix(' secondes')
         self.spinbox.setDecimals(1)
         self.spinbox.setMinimum(0)
@@ -85,128 +91,23 @@ class App(QMainWindow):
         self.setCentralWidget(self.win)
         self.show()
         #self.centre()
-         
     
-    ##############################
-    #       Robot handling       #
-    ##############################
-    
-    def _getImage(self, event, **kwargs):
-        '''Get an image from the Cozmo event loop and show it on screen.'''
-        
-        image      = kwargs['image'].raw_image
-        image.thumbnail((854, 480), Image.ANTIALIAS)
-        self.image = ImageQt(image)
-        pixmap     = QPixmap.fromImage(self.image).scaled(854, 480)
-        self.label.setPixmap(pixmap)
-        return
-    
-    def _moveBack(self, *args, **kwargs):
-        '''Move the robot backward.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(-self.speed, -self.speed)
-        return
-    
-    def _moveBackLeft(self, *args, **kwargs):
-        '''Move the robot to the back left.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(-self.speed, -self.speed*self.factor)
-        return
-    
-    def _moveBackRight(self, *args, **kwargs):
-        '''Move the robot to the back right.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(-self.speed*self.factor, -self.speed)
-        return
-    
-    def _moveFront(self, *args, **kwargs):
-        '''Move the robot frontward.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(self.speed, self.speed)
-        return
-    
-    def _moveFrontLeft(self, *args, **kwargs):
-        '''Move the robot to the front left.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(self.speed, self.speed*self.factor)
-        return
-    
-    def _moveFrontRight(self, *args, **kwargs):
-        '''Move the robot to the front right.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(self.speed*self.factor, self.speed)
-        return
-    
-    def _moveHeadDown(self, *args, **kwargs):
-        '''Move the head down.'''
-        
-        time.sleep(self.delay)
-        self.robot.move_head(-self.headSpeed)
-        return
-    
-    def _moveHeadUp(self, *args, **kwargs):
-        '''Move the head up.'''
-        
-        time.sleep(self.delay)
-        self.robot.move_head(self.headSpeed)
-        return
-    
-    def _moveLeft(self, *args, **kwargs):
-        '''Turn the robot to the left.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(-self.speed, self.speed)
-        return
-    
-    def _moveLiftDown(self, *args, **kwargs):
-        '''Move the lift down.'''
-        
-        time.sleep(self.delay)
-        self.robot.move_lift(-self.liftSpeed)
-        return
-    
-    def _moveLiftUp(self, *args, **kwargs):
-        '''Move the lift up.'''
-        
-        time.sleep(self.delay)
-        self.robot.move_lift(self.liftSpeed)
-        return
-    
-    def _moveRight(self, *args, **kwargs):
-        '''Turn the robot to the right.'''
-        
-        time.sleep(self.delay)
-        self.robot.drive_wheel_motors(self.speed, -self.speed)
-        return
-    
-    def _stop(self, *args, **kwargs):
-        '''Stop the robot.'''
-        
-        self.robot.stop_all_motors()
-        return
-    
-    def _stopHead(self, *args, **kwargs):
-        '''Stop moving the head.'''
-
-        self.robot.move_head(0)
-        return
-    
-    def _stopLift(self, *args, **kwargs):
-        '''Stop moving the lift.'''
-
-        self.robot.move_lift(0)
-        return
-        
     
     ############################
     #       Key handling       #
     ############################
+    
+    def activateCozmo(self, action):
+        '''
+        Activate Cozmo with the given action.
+        
+        :param str action: method to apply to the worker
+        '''
+        
+        print('hey', action)
+        self.worker.newMethod = action
+        
+        return
         
     def keyReleaseEvent(self, eventQKeyEvent, *args, **kwargs):
         '''Stop the robot.'''
@@ -218,54 +119,50 @@ class App(QMainWindow):
             self.direction.remove('front')
             
             if 'left' in self.direction:
-                self._moveLeft()
+                self.activateCozmo('moveLeft')
             elif 'right' in self.direction:
-                self._moveRight()
+                self.activateCozmo('moveRight')
             else:
-                self._stop()
-                
+                self.activateCozmo('stop')
+   
         elif key == Qt.Key_Down and not eventQKeyEvent.isAutoRepeat():
             
-            self.direction.remove('back')
+             self.direction.remove('back')
             
-            if 'left' in self.direction:
-                self._moveLeft()
-            elif 'right' in self.direction:
-                self._moveRight()
-            else:
-                self._stop()
+             if 'left' in self.direction:
+                 self.activateCozmo('moveLeft')
+             elif 'right' in self.direction:
+                 self.activateCozmo('moveRight')
+             else:
+                 self.activateCozmo('stop')
                 
         elif key == Qt.Key_Left and not eventQKeyEvent.isAutoRepeat():
             
-            self.direction.remove('left')
+             self.direction.remove('left')
             
-            if 'front' in self.direction:
-                self._moveFront()
-            elif 'back' in self.direction:
-                self._moveBack()
-            else:
-                self._stop()
+             if 'front' in self.direction:
+                 self.activateCozmo('moveFront')
+             elif 'back' in self.direction:
+                 self.activateCozmo('moveBack')
+             else:
+                 self.activateCozmo('stop')
                 
         elif key == Qt.Key_Right and not eventQKeyEvent.isAutoRepeat():
             
-            self.direction.remove('right')
+             self.direction.remove('right')
             
-            if 'front' in self.direction:
-                self._moveFront()
-            elif 'back' in self.direction:
-                self._moveBack()
-            else:
-                self._stop()
+             if 'front' in self.direction:
+                 self.activateCozmo('moveFront')
+             elif 'back' in self.direction:
+                 self.activateCozmo('moveBack')
+             else:
+                 self.activateCozmo('stop')
                 
         elif key in [Qt.Key_Z, Qt.Key_S] and not eventQKeyEvent.isAutoRepeat():
-                
-            self._stopHead()
-                
+             self.activateCozmo('stopHead')
         elif key in [Qt.Key_P, Qt.Key_M] and not eventQKeyEvent.isAutoRepeat():
-            
-            self._stopLift()
-            
-            
+             self.activateCozmo('stopLift')
+
         return
 
     
@@ -280,60 +177,53 @@ class App(QMainWindow):
                 self.direction.append('front')
                 
                 if 'left' in self.direction:
-                    self._moveFrontLeft()
+                    self.activateCozmo('moveFrontLeft')
                 elif 'right' in self.direction:
-                    self._moveFrontRight()
+                    self.activateCozmo('moveFrontRight')
                 else:
-                    self._moveFront()
-                    
+                    self.activateCozmo('moveFront')
+
             elif key == Qt.Key_Down and not eventQKeyEvent.isAutoRepeat():
                 
-                self.direction.append('back')
+                 self.direction.append('back')
                 
-                if 'left' in self.direction:
-                    self._moveBackLeft()
-                elif 'right' in self.direction:
-                    self._moveBackRight()
-                else:
-                    self._moveBack()
+                 if 'left' in self.direction:
+                     self.activateCozmo('moveBackLeft')
+                 elif 'right' in self.direction:
+                     self.activateCozmo('moveBackRight')
+                 else:
+                     self.activateCozmo('moveBack')
                 
             elif key == Qt.Key_Left and not eventQKeyEvent.isAutoRepeat():
                 
-                self.direction.append('left')
+                 self.direction.append('left')
                 
-                if 'front' in self.direction:
-                    self._moveFrontLeft()
-                elif 'back' in self.direction:
-                    self._moveBackLeft()
-                else:
-                    self._moveLeft()
+                 if 'front' in self.direction:
+                     self.activateCozmo('moveFrontLeft')
+                 elif 'back' in self.direction:
+                     self.activateCozmo('moveBackLeft')
+                 else:
+                     self.activateCozmo('moveLeft')
                     
             elif key == Qt.Key_Right and not eventQKeyEvent.isAutoRepeat():
                 
-                self.direction.append('right')
+                 self.direction.append('right')
                 
-                if 'front' in self.direction:
-                    self._moveFrontRight()
-                elif 'back' in self.direction:
-                    self._moveBackRight()
-                else:
-                    self._moveRight()
+                 if 'front' in self.direction:
+                     self.activateCozmo('moveFrontRight')
+                 elif 'back' in self.direction:
+                     self.activateCozmo('moveBackRight')
+                 else:
+                     self.activateCozmo('moveRight')
                     
             elif key == Qt.Key_Z and not eventQKeyEvent.isAutoRepeat():
-                
-                self._moveHeadUp()
-                
-            elif key == Qt.Key_S and not eventQKeyEvent.isAutoRepeat():
-                
-                self._moveHeadDown()
-                
+                 self.activateCozmo('moveHeadUp') 
+            elif key == Qt.Key_S and not eventQKeyEvent.isAutoRepeat():   
+                 self.activateCozmo('moveHeadDown')  
             elif key == Qt.Key_P and not eventQKeyEvent.isAutoRepeat():
-            
-                self._moveLiftUp()
-
+                 self.activateCozmo('moveLiftUp')
             elif key == Qt.Key_M and not eventQKeyEvent.isAutoRepeat():
-            
-                self._moveLiftDown()
+                 self.activateCozmo('moveLiftDown')
 
         except RobotBusy:
             pass
@@ -349,14 +239,8 @@ class App(QMainWindow):
     def delay(self, *args, **kwargs):
         '''Get the current delay to apply to the robot.'''
         
-        text = self.combobox.currentText()
-        if text in self.delays:
-            return self.delays[text]
-        else:
-            print('Error: no delay %s found in delays list %s.' %(text, self.delays))
-        
-        return 0
-      
+        return self.spinbox.value()
+    
     def centre(self, *args, **kwargs):
          '''Centre the window.'''
     
@@ -370,11 +254,33 @@ class App(QMainWindow):
          
          return
      
+    def spinboxPressEvent(self, eventQKeyEvent, *args, **kwargs):
+        '''Press event actions for the spinbox widget.'''
         
-    def 
+        key = eventQKeyEvent.key()
+        
+        if key in [Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right, Qt.Key_Z, Qt.Key_S, Qt.Key_P, Qt.Key_M]:
+            self.keyPressEvent(eventQKeyEvent, *args, **kwargs)
+        else:
+            self.spinbox.savedKeyPressEvent(eventQKeyEvent, *args, **kwargs)
+            
+        return
+        
+    def updateDelay(self, *args, **kwargs):
+        '''Update the delay value in the spinbox.'''
+        
+        text = self.combobox.currentText()
+        if text in self.delays:
+            self.spinbox.setReadOnly(True)
+            self.spinbox.setValue(self.delays[text])
+        elif text == 'Manuel':
+            self.spinbox.setReadOnly(False)
+        else:
+            print('Error, no delay could be applied with this choice.')
+        
+        return
      
-    
-     
+
 def startGUI(robot, *args, **kwargs):
     root   = QApplication(sys.argv)
     app    = App(root, robot)
