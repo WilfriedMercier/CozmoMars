@@ -104,7 +104,6 @@ class App(QMainWindow):
         :param str action: method to apply to the worker
         '''
         
-        print('hey', action)
         self.worker.newMethod = action
         
         return

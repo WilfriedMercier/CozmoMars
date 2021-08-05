@@ -48,6 +48,8 @@ class Worker(QObject):
         # Which method to apply
         self.method                            = None
         self.newMethod                         = None
+        self.time                              = 0
+        self.timer                             = 0
 
     def run(self, *args, **kwargs):
         """Run method."""
@@ -56,7 +58,12 @@ class Worker(QObject):
             
             #If method changed, we update and apply it
             if self.newMethod != self.method:
+                
                 self._updateMethod()
+                ttime      = time.time()
+                self.timer = ttime - self.time
+                self.time  = ttime
+                print('Action', self.method, 'Timer', self.timer)
                 
                 try:
                     getattr(self, self.method)(*args, **kwargs)
@@ -72,7 +79,11 @@ class Worker(QObject):
     def delay(self, *args, **kwargs):
         '''Reimplement parent delay attribute.'''
         
-        return self.parent.delay
+        delay = self.parent.delay
+        if self.timer < delay:
+            delay = self.timer
+            
+        return delay
     
     def _updateMethod(self, *args, **kwargs):
         '''Update the method value with the new one.'''
