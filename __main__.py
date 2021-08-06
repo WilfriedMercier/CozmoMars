@@ -12,6 +12,8 @@ import asyncio
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+
+import time
 import sys
 
 import cozmo
@@ -20,12 +22,10 @@ from   cozmo.exceptions import RobotBusy
 
 from   PyQt5.QtWidgets  import QMainWindow, QApplication, QWidget, QGridLayout, QLabel, QShortcut, QComboBox, QDoubleSpinBox
 from   PyQt5.QtGui      import QKeySequence
-from   PyQt5.QtCore     import Qt, QThread
+from   PyQt5.QtCore     import Qt, QThread, QTimer
 
 from   PIL              import Image
 from   PIL.ImageQt      import ImageQt
-
-from   types            import MethodType
 
 from   cozmo_backend    import Worker
 
@@ -41,14 +41,9 @@ class App(QMainWindow):
         self.setWindowTitle('Cozmo Mars')
         
         # Setup robot properties
-        self.thread                       = QThread()
-        self.worker                       = Worker(self, robot, 100, 0.3, 1, 2)
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.run)
-        self.thread.start()
-        
+        self.robot                        = Worker(self, robot, 100, 0.3, 1, 2)
         self.direction                    = []
-        
+        self.pause                        = False
         
         # Delay to add to Cozmo 
         self.delays                       = {'Mars'  : 2.5,
@@ -61,9 +56,14 @@ class App(QMainWindow):
         self.layoutWin                    = QGridLayout()
         
         # Widgets
-        self.label = QLabel()
         
-        self.combobox = QComboBox()
+        self.nameLabel1                   = QLabel('Astre de destination')
+        self.nameLabel2                   = QLabel('Délai')
+        
+        self.label                        = QLabel()
+        self.label.mousePressEvent        = self.labelConnect
+        
+        self.combobox                     = QComboBox()
         self.combobox.keyPressEvent       = self.keyPressEvent
         self.combobox.insertItem(0, 'Lune')
         self.combobox.insertItem(1, 'Venus')
@@ -71,7 +71,7 @@ class App(QMainWindow):
         self.combobox.insertItem(3, 'Manuel')
         self.combobox.activated.connect(self.updateDelay)
         
-        self.spinbox  = QDoubleSpinBox()
+        self.spinbox                      = QDoubleSpinBox()
         self.spinbox.savedKeyPressEvent   = self.spinbox.keyPressEvent
         self.spinbox.keyPressEvent        = self.spinboxPressEvent
         self.spinbox.setReadOnly(True)
@@ -81,9 +81,11 @@ class App(QMainWindow):
         self.spinbox.setValue(self.delays['Lune'])
 
         # Setup layout    
-        self.layoutWin.addWidget(self.combobox, 1, 1)
-        self.layoutWin.addWidget(self.spinbox, 1, 2)
-        self.layoutWin.addWidget(self.label, 2, 1, 1, 2)
+        self.layoutWin.addWidget(self.nameLabel1, 1, 1)
+        self.layoutWin.addWidget(self.nameLabel2, 1, 2)
+        self.layoutWin.addWidget(self.combobox,   2, 1)
+        self.layoutWin.addWidget(self.spinbox,    2, 2)
+        self.layoutWin.addWidget(self.label,      3, 1, 1, 2)
         
         self.win.setLayout(self.layoutWin)
         
@@ -91,6 +93,44 @@ class App(QMainWindow):
         self.setCentralWidget(self.win)
         self.show()
         #self.centre()
+        self.resumeCozmo()
+        self.robot.robot.say_text("Allez ! On va bien samuser !", voice_pitch=1) #, play_excited_animation=True)
+        #self.robot.robot.say_text('', play_excited_animation=True)
+        
+        
+    ################################################
+    #       Pause and resume Cozmo functions       #
+    ################################################
+    
+    def labelConnect(self, *args, **kwargs):
+        '''Slot related to clicking on the main label.'''
+        
+        if self.pause:
+            self.resumeCozmo()
+        else:
+            self.pauseCozmo()
+            
+        return
+    
+    def pauseCozmo(self, *args, **kwargs):
+        '''Pause Cozmo autonomous behaviour.'''
+        
+        self.robot.stop()
+        self.robot.stopHead()
+        self.robot.stopLift()
+        self.robot.stopAnimate()
+        self.label.setStyleSheet("border: 3px solid red")
+        self.pause = True
+        return
+    
+    def resumeCozmo(self, *args, **kwargs):
+        '''Resume Cozmo autonomous behaviour.'''
+        
+        delay = int(self.delay*1000)
+        QTimer.singleShot(delay + self.robot.behaviourDelay, self.robot.animate)
+        self.label.setStyleSheet("border: 3px solid green")
+        self.pause = False
+        return
     
     
     ############################
@@ -104,8 +144,13 @@ class App(QMainWindow):
         :param str action: method to apply to the worker
         '''
         
-        self.worker.newMethod = action
-        
+        if not self.pause:
+            delay = int(self.delay*1000)
+            QTimer.singleShot(delay, getattr(self.robot, action))
+            
+            if 'stop' in action:
+                QTimer.singleShot(delay + self.robot.behaviourDelay, self.robot.animate)
+            
         return
         
     def keyReleaseEvent(self, eventQKeyEvent, *args, **kwargs):
@@ -171,6 +216,10 @@ class App(QMainWindow):
         key = eventQKeyEvent.key()
         
         try:
+            
+            # Update behaviour time when any key is pressed
+            self.robot.setBehaviourTime()
+            
             if key == Qt.Key_Up and not eventQKeyEvent.isAutoRepeat():
                 
                 self.direction.append('front')
