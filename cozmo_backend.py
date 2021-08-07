@@ -35,11 +35,11 @@ class Worker:
         
         # Setup robot properties
         self.robot                             = robot
-        self.speed                             = speed
         self.headSpeed                         = headSpeed
         self.liftSpeed                         = liftSpeed
         self.factor                            = factor
         self.behaviour                         = False
+        self.setSpeed(speed)
         
         self.robot.camera.color_image_enabled  = True
         self.robot.camera.image_stream_enabled = True
@@ -51,6 +51,20 @@ class Worker:
         # Delay required for a behaviour to start (in ms)
         self.behaviourDelay                    = 3000
     
+    
+    #############################
+    #       Miscellaneous       #
+    #############################
+    
+    def setSpeed(self, speed, *args, **kwargs):
+        '''
+        Set the robot speed.
+        
+        :param int speed: speed
+        '''
+        
+        self.speed = int(speed)
+        return
 
     def setBehaviourTime(self, *args, **kwargs):
         '''Set the behavior time.'''
@@ -108,14 +122,14 @@ class Worker:
         '''Move the robot to the back left.'''
         
         self.stopAnimate()
-        self.robot.drive_wheel_motors(-self.speed, -self.speed*self.factor)
+        self.robot.drive_wheel_motors(-self.speed/self.factor, -self.speed*self.factor)
         return
     
     def moveBackRight(self, *args, **kwargs):
         '''Move the robot to the back right.'''
         
         self.stopAnimate()
-        self.robot.drive_wheel_motors(-self.speed*self.factor, -self.speed)
+        self.robot.drive_wheel_motors(-self.speed*self.factor, -self.speed/self.factor)
         return
     
     def moveFront(self, *args, **kwargs):
@@ -129,14 +143,14 @@ class Worker:
         '''Move the robot to the front left.'''
         
         self.stopAnimate()
-        self.robot.drive_wheel_motors(self.speed, self.speed*self.factor)
+        self.robot.drive_wheel_motors(self.speed/self.factor, self.speed*self.factor)
         return
     
     def moveFrontRight(self, *args, **kwargs):
         '''Move the robot to the front right.'''
         
         self.stopAnimate()
-        self.robot.drive_wheel_motors(self.speed*self.factor, self.speed)
+        self.robot.drive_wheel_motors(self.speed*self.factor, self.speed/self.factor)
         return
     
     def moveHeadDown(self, *args, **kwargs):

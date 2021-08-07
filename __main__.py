@@ -20,7 +20,7 @@ import cozmo
 from   cozmo.util       import distance_mm, speed_mmps, degrees
 from   cozmo.exceptions import RobotBusy
 
-from   PyQt5.QtWidgets  import QMainWindow, QApplication, QWidget, QGridLayout, QLabel, QShortcut, QComboBox, QDoubleSpinBox
+from   PyQt5.QtWidgets  import QMainWindow, QApplication, QWidget, QGridLayout, QLabel, QShortcut, QComboBox, QDoubleSpinBox, QSpinBox
 from   PyQt5.QtGui      import QKeySequence
 from   PyQt5.QtCore     import Qt, QThread, QTimer
 
@@ -41,7 +41,7 @@ class App(QMainWindow):
         self.setWindowTitle('Cozmo Mars')
         
         # Setup robot properties
-        self.robot                        = Worker(self, robot, 100, 0.3, 1, 2)
+        self.robot                        = Worker(self, robot, 100, 0.3, 1, 4)
         self.direction                    = []
         self.pause                        = False
         
@@ -59,6 +59,7 @@ class App(QMainWindow):
         
         self.nameLabel1                   = QLabel('Astre de destination')
         self.nameLabel2                   = QLabel('Délai')
+        self.nameLabel3                   = QLabel('Vitesse')
         
         self.label                        = QLabel()
         self.label.mousePressEvent        = self.labelConnect
@@ -73,19 +74,31 @@ class App(QMainWindow):
         
         self.spinbox                      = QDoubleSpinBox()
         self.spinbox.savedKeyPressEvent   = self.spinbox.keyPressEvent
-        self.spinbox.keyPressEvent        = self.spinboxPressEvent
+        self.spinbox.keyPressEvent        = lambda *args, **kwargs: self.spinboxPressEvent(self.spinbox, *args, **kwargs)
         self.spinbox.setReadOnly(True)
         self.spinbox.setSuffix(' secondes')
         self.spinbox.setDecimals(1)
         self.spinbox.setMinimum(0)
         self.spinbox.setValue(self.delays['Lune'])
+        
+        self.spinboxSpd                    = QSpinBox()
+        self.spinboxSpd.savedKeyPressEvent = self.spinboxSpd.keyPressEvent
+        self.spinboxSpd.keyPressEvent      = lambda *args, **kwargs: self.spinboxPressEvent(self.spinboxSpd, *args, **kwargs)
+        self.spinboxSpd.setSuffix(' mm/s')
+        self.spinboxSpd.setMinimum(10)
+        self.spinboxSpd.setMaximum(1000)
+        self.spinboxSpd.setSingleStep(10)
+        self.spinboxSpd.setValue(int(self.robot.speed))
+        self.spinboxSpd.valueChanged.connect(self.robot.setSpeed)
 
         # Setup layout    
         self.layoutWin.addWidget(self.nameLabel1, 1, 1)
         self.layoutWin.addWidget(self.nameLabel2, 1, 2)
+        self.layoutWin.addWidget(self.nameLabel3, 1, 3)
         self.layoutWin.addWidget(self.combobox,   2, 1)
         self.layoutWin.addWidget(self.spinbox,    2, 2)
-        self.layoutWin.addWidget(self.label,      3, 1, 1, 2)
+        self.layoutWin.addWidget(self.spinboxSpd, 2, 3)
+        self.layoutWin.addWidget(self.label,      3, 1, 1, 3)
         
         self.win.setLayout(self.layoutWin)
         
@@ -94,7 +107,7 @@ class App(QMainWindow):
         self.show()
         #self.centre()
         self.resumeCozmo()
-        self.robot.robot.say_text("Allez ! On va bien samuser !", voice_pitch=1) #, play_excited_animation=True)
+        self.robot.robot.say_text("C'est parti mon kiki !", voice_pitch=1) #, play_excited_animation=True)
         #self.robot.robot.say_text('', play_excited_animation=True)
         
         
@@ -302,15 +315,19 @@ class App(QMainWindow):
          
          return
      
-    def spinboxPressEvent(self, eventQKeyEvent, *args, **kwargs):
-        '''Press event actions for the spinbox widget.'''
+    def spinboxPressEvent(self, which, eventQKeyEvent, *args, **kwargs):
+        '''
+        Press event actions for the spinbox widget.
+        
+        :param QWidget which: spinbox widhet to aply the key press event
+        '''
         
         key = eventQKeyEvent.key()
         
         if key in [Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right, Qt.Key_Z, Qt.Key_S, Qt.Key_P, Qt.Key_M]:
             self.keyPressEvent(eventQKeyEvent, *args, **kwargs)
         else:
-            self.spinbox.savedKeyPressEvent(eventQKeyEvent, *args, **kwargs)
+            which.savedKeyPressEvent(eventQKeyEvent, *args, **kwargs)
             
         return
         
