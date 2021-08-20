@@ -8,26 +8,28 @@ Created on Tue Aug  3 16:57:39 2021
 Simple GUI which shows Cozmo camera and allow to control with a delay supposed to mimick the delay of rovers on Mars.
 """
 
-import asyncio
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
 import time
 import sys
-
+    
 import cozmo
 from   cozmo.util       import distance_mm, speed_mmps, degrees
 from   cozmo.exceptions import RobotBusy
 
 from   PyQt5.QtWidgets  import QMainWindow, QApplication, QWidget, QGridLayout, QLabel, QShortcut, QComboBox, QDoubleSpinBox, QSpinBox
-from   PyQt5.QtGui      import QKeySequence
+from   PyQt5.QtGui      import QKeySequence, QPixmap
 from   PyQt5.QtCore     import Qt, QThread, QTimer
 
 from   PIL              import Image
 from   PIL.ImageQt      import ImageQt
 
 from   cozmo_backend    import Worker
+
+# Global variable containing image to show when no robot is connected
+NOROBOTDEFAULTIMAGE                       = 'norobotdefaultimage.png'
 
 class App(QMainWindow):
     '''Main application.'''
@@ -115,6 +117,8 @@ class App(QMainWindow):
             self.resumeCozmo()    
             self.robot.robot.say_text("C'est parti mon kiki !", voice_pitch=1) #, play_excited_animation=True)
             #self.robot.robot.say_text('', play_excited_animation=True)
+        else:
+            self.label.setPixmap(QPixmap(NOROBOTDEFAULTIMAGE))
         
         
     ################################################
