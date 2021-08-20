@@ -29,7 +29,6 @@ from   PIL.ImageQt      import ImageQt
 
 from   cozmo_backend    import Worker
 
-
 class App(QMainWindow):
     '''Main application.'''
     
@@ -41,7 +40,11 @@ class App(QMainWindow):
         self.setWindowTitle('Cozmo Mars')
         
         # Setup robot properties
-        self.robot                        = Worker(self, robot, 100, 0.3, 1, 4)
+        if robot is not None:
+            self.robot                    = Worker(self, robot, 100, 0.3, 1, 4)
+        else:
+            self.robot                    = None
+            
         self.direction                    = []
         self.pause                        = False
         
@@ -88,8 +91,8 @@ class App(QMainWindow):
         self.spinboxSpd.setMinimum(10)
         self.spinboxSpd.setMaximum(1000)
         self.spinboxSpd.setSingleStep(10)
-        self.spinboxSpd.setValue(int(self.robot.speed))
-        self.spinboxSpd.valueChanged.connect(self.robot.setSpeed)
+        self.spinboxSpd.setValue(int(self.robot.speed) if self.robot is not None else 10)
+        self.spinboxSpd.valueChanged.connect(self.robot.setSpeed if self.robot is not None else lambda *args, **kwargs: None)
 
         # Setup layout    
         self.layoutWin.addWidget(self.nameLabel1, 1, 1)
@@ -106,9 +109,12 @@ class App(QMainWindow):
         self.setCentralWidget(self.win)
         self.show()
         #self.centre()
-        self.resumeCozmo()
-        self.robot.robot.say_text("C'est parti mon kiki !", voice_pitch=1) #, play_excited_animation=True)
-        #self.robot.robot.say_text('', play_excited_animation=True)
+        
+        # If Cozmo is not detected we do not activate it
+        if self.robot is not None:
+            self.resumeCozmo()    
+            self.robot.robot.say_text("C'est parti mon kiki !", voice_pitch=1) #, play_excited_animation=True)
+            #self.robot.robot.say_text('', play_excited_animation=True)
         
         
     ################################################
@@ -352,6 +358,10 @@ def startGUI(robot, *args, **kwargs):
     sys.exit(root.exec_())
 
 if __name__ == '__main__':
-    cozmo.run_program(startGUI)
+    try:
+        cozmo.run_program(startGUI)
+    except:
+        print('Error: no Cozmo robot found. Starting empty GUI.')
+        startGUI(None)
      
    

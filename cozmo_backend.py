@@ -49,7 +49,7 @@ class Worker:
         self.behaviourTime                     = 0
         
         # Delay required for a behaviour to start (in ms)
-        self.behaviourDelay                    = 3000
+        self.behaviourDelay                    = 10000
     
     
     #############################
