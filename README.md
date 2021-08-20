@@ -52,7 +52,7 @@ L'interface est composée de deux lignes:
 Les commandes suivantes sont disponibles pour contrôler Cozmo:
 
 - flèches haut, bas, gauche, droite pour déplacer le robot en avant, en arrière, à gauche et à droite
-- touches Z et S pour monter et descendre la caméra
+- touches __Z__ et S pour monter et descendre la caméra
 - touches P et M pour monter et descencre les bras
 
 Après 10 secondes d'inactivité (facilement modifiable dans le code source via self.behaviourDelay dans cozmo_backend.py), Cozmo devient de nouveau autonome. Il suffit d'appuyer sur n'importe quelle touche citée plus haut pour reprendre le contrôle. Il est aussi possible de mettre en pause Cozmo, qui devient inactif aux touches, en cliquant sur l'image de la caméra. la bordure devient rouge et il ne répond plus. Un autre clique (la bordure devient verte) le réactive.
